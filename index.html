@@ -1,0 +1,124 @@
+<html>
+	<head>
+		<title>Game</title>
+		<script type="text/javascript" src="glMatrix-0.9.5.min.js"></script>
+		<script type="text/javascript" src="scene.js"></script>
+		<script id="fragmentShader" type="x-shader/x-fragment">
+			void main(void) {
+				gl_FragColor = vec4(0.0, 1.0, 0.0, 1.0);
+			}
+		</script>	
+		<script id="vertexShader" type="x-shader/x-vertex">
+			attribute vec3 vertex;
+			uniform mat4 modelViewMatrix;
+			uniform mat4 perspectiveMatrix;
+			void main(void) {
+				gl_Position = perspectiveMatrix * modelViewMatrix * vec4(vertex, 1.0);
+			}
+		</script>		
+		<script type="text/javascript">
+
+			//encapsulate shader loading in shader nodes
+				//proper error handling
+			//i need to be deleting resources on close: delete program, delete shader objects, context? browser fucking up after a while.
+			//cache everything, gl methods... everything.
+			//use md5 mesh instead of collada, both text formats but md5 is much faster http://blog.tojicode.com/2010/06/its-alive-idtech4-models-with-skinning.html
+			
+			/*
+			 * Globals
+			 */
+			var gl;
+			var canvas;
+			var scene;
+			var modelViewMatrix = mat4.create();
+			var perspectiveMatrix = mat4.create();
+			/*
+			 * Setup WebGL
+			 */
+			function start() {
+				canvas = document.getElementById("canvas");															//get canvas tag, what does var do?
+				if(!window.WebGLRenderingContext){																	//get a webgl context
+					alert("Browser does not support webGL.");
+					return;
+				}
+				var names = ["webgl","experimental-webgl","webkit-3d","moz-webgl"];
+				for(var a = 0; a < names.length; ++a){
+					try {
+						gl = canvas.getContext(names[a]);
+					}
+					catch(e){}
+					if(gl) break;
+				}
+				if(!gl) {
+					alert("Unable to get a webGL context.");
+					return;
+				}
+				gl.clearColor(0.0, 0.0, 0.0, 1.0);
+				gl.enable(gl.DEPTH_TEST);
+				resize();																							//Setup viewport
+				window.onresize = resize;
+				loadWorld();																						//load world
+				requestAnimFrame(update, canvas);																	//start animation loop
+			}
+			/*
+			 * Load world
+			 */
+			function loadWorld() {
+				var shaderProgram = gl.createProgram();																//build shader program
+				gl.attachShader(shaderProgram, getShader("vertexShader", gl.VERTEX_SHADER));
+				gl.attachShader(shaderProgram, getShader("fragmentShader", gl.FRAGMENT_SHADER));
+				gl.linkProgram(shaderProgram);
+				shaderProgram.vertex = gl.getAttribLocation(shaderProgram, "vertex");
+				gl.enableVertexAttribArray(shaderProgram.vertex);
+				shaderProgram.perspectiveMatrix = gl.getUniformLocation(shaderProgram, "perspectiveMatrix");
+				shaderProgram.modelViewMatrix = gl.getUniformLocation(shaderProgram, "modelViewMatrix");
+				scene = new ShaderNode(shaderProgram);																//setup nodes
+				var world = new EntityNode();
+				scene.add(world);
+				var rotX = new RotationNode(0, [1.0, 0.0, 0.0]);
+				scene.add(rotX);
+				var rotY = new RotationNode(0.5, [0.0, 1.0, 0.0]);
+				rotX.add(rotY);
+				var player = new EntityNode();
+				rotY.add(player);
+			}
+			/*
+			 * Resize Event
+			 */
+			function resize() {
+				var width = canvas.clientWidth;
+				var height = canvas.clientHeight;
+				gl.viewport(0, 0, width, height);
+				mat4.perspective(45, width / height, 0.1, 100.0, perspectiveMatrix);
+			}
+			/*
+			 * Load a shader
+			 */
+			function getShader(id, type) {
+				var shaderScript = document.getElementById(id);
+				shader = gl.createShader(type);
+				gl.shaderSource(shader, shaderScript.firstChild.textContent);
+				gl.compileShader(shader);
+				return shader;
+			}
+			/*
+			 * Update loop
+			 */
+			function update() {
+				gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+				mat4.identity(modelViewMatrix);
+				scene.execute();
+				requestAnimFrame(update, canvas);
+			}
+			/*
+			 * Request Animation Frame
+			 */	
+			requestAnimFrame=(function(){
+				return window.requestAnimationFrame||window.webkitRequestAnimationFrame||window.mozRequestAnimationFrame||window.oRequestAnimationFrame||window.msRequestAnimationFrame||function(callback,element){window.setTimeout(callback,1000/60);};
+			})();
+		</script>
+	</head>
+	<body onload="start();">
+		<canvas id="canvas" width="1152" height="648" style="display: block; margin: 0 auto;"></canvas>
+	</body>
+</html>
